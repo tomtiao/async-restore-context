@@ -1,9 +1,4 @@
 // Helper start
-type OkResult<T> = { error: undefined, value: T }
-type ErrResult<E> = { error: E, value: undefined }
-type Result<T, E> =
-    | ErrResult<E>
-    | OkResult<T>
 
 type OkAsyncResult<T> = { error: undefined, result: T, instance: undefined }
 type ErrAsyncResult<T, E> = { error: E, result: undefined, instance: Generator<Promise<T>, Promise<T>, T> }
