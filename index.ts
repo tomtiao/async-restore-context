@@ -184,15 +184,10 @@ async function mainLoop() {
         if (result.error) {
             console.error(result.error);
             // 用户断线，保存
-            abnormal.set(id, {
-                instance: result.instance,
-                error: result.error,
-                result: undefined
-            });
+            abnormal.set(id, result);
             continue;
         }
         // 正常结束
-        Serializer.delete(id);
         console.log("编号", id, "结果", result.result);        
     }
 }
