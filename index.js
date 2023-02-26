@@ -23,6 +23,9 @@ class Connection {
     static get(userId) {
         return this.connections.get(userId);
     }
+    static onConnectionCreated(cb) {
+        this.createdCb.push(cb);
+    }
     onConnected(cb) {
         this.connectionCb.push(cb);
     }
@@ -30,6 +33,7 @@ class Connection {
         this.disconnectCb.push(cb);
     }
     connect() {
+        Connection.createdCb.forEach((cb) => cb(this.id));
         this.connectionCb.forEach((cb) => cb(this.id));
     }
     disconnect() {
@@ -38,6 +42,7 @@ class Connection {
     }
 }
 Connection.connections = new Map();
+Connection.createdCb = [];
 class Serializer {
     static serialize(id, o) {
         globalThis.localStorage.setItem(id, JSON.stringify(o));
@@ -113,35 +118,41 @@ function execute(gen, err, v, resume = false) {
 }
 const abnormal = new Map();
 const currentId = 'a';
-function mainLoop(id) {
+function mainLoop() {
     return __awaiter(this, void 0, void 0, function* () {
-        let result;
-        if (abnormal.has(id)) {
-            const prevResult = abnormal.get(id);
-            abnormal.delete(id);
-            result = yield execute(prevResult.instance, prevResult.error, undefined, true);
-        }
-        else if (Serializer.has(id)) {
-            result = yield co(coreLogic, [Serializer.deserialize(id)]);
-        }
-        else {
-            result = yield co(coreLogic, []);
-        }
-        if (result.error) {
-            console.error(result.error);
-            // 用户断线，保存
-            abnormal.set(id, {
-                instance: result.instance,
-                error: result.error,
-                result: undefined
+        while (true) {
+            const id = yield new Promise((resolve) => {
+                Connection.onConnectionCreated((id) => resolve(id));
             });
-            return;
+            let result;
+            if (abnormal.has(id)) {
+                const prevResult = abnormal.get(id);
+                abnormal.delete(id);
+                result = yield execute(prevResult.instance, prevResult.error, undefined, true);
+            }
+            else if (Serializer.has(id)) {
+                result = yield co(coreLogic, [Serializer.deserialize(id)]);
+            }
+            else {
+                result = yield co(coreLogic, []);
+            }
+            if (result.error) {
+                console.error(result.error);
+                // 用户断线，保存
+                abnormal.set(id, {
+                    instance: result.instance,
+                    error: result.error,
+                    result: undefined
+                });
+                continue;
+            }
+            // 正常结束
+            Serializer.delete(id);
+            console.log("编号", id, "结果", result.result);
         }
-        // 正常结束
-        Serializer.delete(id);
-        console.log("编号", id, "结果", result.result);
     });
 }
+mainLoop();
 let connectionStatus = 0;
 // UI start
 const statusP = document.querySelector("#status");
@@ -166,7 +177,6 @@ toggleConnect.addEventListener("click", () => {
     var _a;
     if (connectionStatus === 0) {
         const conn = Connection.create(currentId);
-        conn.onConnected(mainLoop);
         conn.connect();
         connectionStatus += 1;
         updateStatusText();

@@ -24,6 +24,12 @@ class Connection {
         return this.connections.get(userId);
     }
 
+    static createdCb: ((id: string) => unknown)[] = [];
+
+    static onConnectionCreated(cb: (id: string) => unknown) {
+        this.createdCb.push(cb);
+    }
+
     connectionCb: ((...args: unknown[]) => unknown)[] = [];
     onConnected(cb: (...args: any[]) => any) {
         this.connectionCb.push(cb);
@@ -35,6 +41,7 @@ class Connection {
     }
 
     connect() {
+        Connection.createdCb.forEach((cb) => cb(this.id));
         this.connectionCb.forEach((cb) => cb(this.id));
     }
 
@@ -154,33 +161,43 @@ const abnormal: Map<string, ErrAsyncResult<number, Error>> = new Map();
 
 const currentId = 'a';
 
-async function mainLoop(id: string) {
-    let result: AsyncResult<number, Error>;
-    if (abnormal.has(id)) {
-        const prevResult = abnormal.get(id)!;
-        abnormal.delete(id);
-
-        result = await execute(prevResult.instance, prevResult.error, undefined, true);
-    } else if (Serializer.has(id)) {
-        result = await co(coreLogic, [Serializer.deserialize(id)]);
-    } else {
-        result = await co(coreLogic, []);
-    }
-
-    if (result.error) {
-        console.error(result.error);
-        // 用户断线，保存
-        abnormal.set(id, {
-            instance: result.instance,
-            error: result.error,
-            result: undefined
+async function mainLoop() {
+    while (true) {
+        const id = await new Promise<string>((resolve) => {
+            Connection.onConnectionCreated(
+                (id) => resolve(id)
+            );
         });
-        return;
+
+        let result: AsyncResult<number, Error>;
+        if (abnormal.has(id)) {
+            const prevResult = abnormal.get(id)!;
+            abnormal.delete(id);
+    
+            result = await execute(prevResult.instance, prevResult.error, undefined, true);
+        } else if (Serializer.has(id)) {
+            result = await co(coreLogic, [Serializer.deserialize(id)]);
+        } else {
+            result = await co(coreLogic, []);
+        }
+    
+        if (result.error) {
+            console.error(result.error);
+            // 用户断线，保存
+            abnormal.set(id, {
+                instance: result.instance,
+                error: result.error,
+                result: undefined
+            });
+            continue;
+        }
+        // 正常结束
+        Serializer.delete(id);
+        console.log("编号", id, "结果", result.result);        
     }
-    // 正常结束
-    Serializer.delete(id);
-    console.log("编号", id, "结果", result.result);
 }
+
+mainLoop();
 
 let connectionStatus: 0 | 1 | 2 = 0;
 
@@ -208,7 +225,6 @@ const toggleConnect = document.querySelector("#user-toggle-connect");
 toggleConnect!.addEventListener("click", () => {
     if (connectionStatus === 0) {
         const conn = Connection.create(currentId);
-        conn.onConnected(mainLoop);
         conn.connect();
         connectionStatus += 1;
         updateStatusText();
