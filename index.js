@@ -1,4 +1,5 @@
 "use strict";
+// Helper start
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -87,14 +88,14 @@ function choose() {
             reject(new Error("用户断线"));
         });
         // 用户成功输入
-        input.addEventListener("click", () => {
+        onInputOnce(() => {
             resolve(Math.trunc(Math.random() * 43));
-        }, { once: true });
+        });
     });
 }
 function execute(gen, err, v, resume = false) {
     let value, done;
-    if (err) {
+    if (err !== undefined) {
         if (resume) {
             ({ value, done = false } = gen.throw(err));
         }
@@ -157,6 +158,9 @@ function updateStatusText() {
             break;
     }
 }
+function onInputOnce(cb) {
+    input.addEventListener("click", cb, { once: true });
+}
 const toggleConnect = document.querySelector("#user-toggle-connect");
 toggleConnect.addEventListener("click", () => {
     var _a;
@@ -181,11 +185,11 @@ input.addEventListener("click", () => {
     }
 });
 const refresh = document.querySelector("#refresh");
-refresh === null || refresh === void 0 ? void 0 : refresh.addEventListener("click", () => {
+refresh.addEventListener("click", () => {
     globalThis.location.reload();
 });
 const clear = document.querySelector("#clear-storage");
-clear === null || clear === void 0 ? void 0 : clear.addEventListener("click", () => {
+clear.addEventListener("click", () => {
     globalThis.localStorage.clear();
 });
 updateStatusText();

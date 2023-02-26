@@ -59,8 +59,11 @@ class Serializer {
     }
 }
 
-function co<T, E>(gen: (...args: any[]) => Generator<Promise<T>, Promise<T>, T>, args: any[]) {
-    return execute(gen(...args), undefined as E, undefined as T);
+function co<T = unknown, E = any>(
+    gen: (...args: any[]) => Generator<Promise<T>, Promise<T>, T>,
+    args: any[]
+): Promise<AsyncResult<T, E>> {
+    return execute(gen(...args), undefined, undefined as T);
 }
 // Helper end
 
@@ -75,7 +78,7 @@ function* coreLogic(prevState?: unknown): Generator<Promise<number>, Promise<num
     console.log("状态", state);
     Serializer.serialize(currentId, state);
 
-    let result;
+    let result: number;
     while (true) {
         try {
             result = yield choose();
@@ -98,28 +101,40 @@ function choose() {
         });
 
         // 用户成功输入
-        input!.addEventListener("click", () => {
+        onInputOnce(() => {
             resolve(Math.trunc(Math.random() * 43));
-        }, { once: true });
+        });
     });
 }
 
+function execute<T = unknown, E = any>(
+    gen: Generator<Promise<T>, Promise<T>, T>,
+    err: E,
+    v: undefined,
+    resume?: boolean
+): Promise<AsyncResult<T, E>>;
+function execute<T = unknown, E = any>(
+    gen: Generator<Promise<T>, Promise<T>, T>,
+    err: undefined,
+    v: T,
+    resume?: false
+): Promise<AsyncResult<T, E>>;
 function execute<T, E>(
     gen: Generator<Promise<T>, Promise<T>, T>,
-    err: E | undefined,
-    v: T | undefined,
+    err: E,
+    v: T,
     resume = false
 ): Promise<AsyncResult<T, E>> {
     let value: Promise<T>, done: boolean;
 
-    if (err) {
+    if (err !== undefined) {
         if (resume) {
             ({ value, done = false } = gen.throw(err));
         } else {
             return Promise.resolve({ error: err, result: undefined, instance: gen });
         }
     } else {
-        ({ value, done = false } = gen.next(v as T));
+        ({ value, done = false } = gen.next(v));
     }
 
     if (done) {
@@ -130,7 +145,7 @@ function execute<T, E>(
     }
 
     return value.then(
-        (v) => execute(gen, undefined as E, v),
+        (v) => execute(gen, undefined, v),
         (err) => execute(gen, err, undefined)
     );
 }
@@ -185,6 +200,10 @@ function updateStatusText() {
     }
 }
 
+function onInputOnce(cb: (...args: unknown[]) => void) {
+    input!.addEventListener("click", cb, { once: true });
+}
+
 const toggleConnect = document.querySelector("#user-toggle-connect");
 toggleConnect!.addEventListener("click", () => {
     if (connectionStatus === 0) {
@@ -209,12 +228,12 @@ input!.addEventListener("click", () => {
 });
 
 const refresh = document.querySelector("#refresh");
-refresh?.addEventListener("click", () => {
+refresh!.addEventListener("click", () => {
     globalThis.location.reload();
 });
 
 const clear = document.querySelector("#clear-storage");
-clear?.addEventListener("click", () => {
+clear!.addEventListener("click", () => {
     globalThis.localStorage.clear();
 });
 
