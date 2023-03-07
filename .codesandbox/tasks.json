@@ -1,0 +1,18 @@
+{
+  // These tasks will run in order when initializing your CodeSandbox project.
+  "setupTasks": [
+    {
+      "name": "yarn install",
+      "command": "yarn install"
+    }
+  ],
+
+  // These tasks can be run from CodeSandbox. Running one will open a log in the app.
+  "tasks": {
+    "python3 -m http.server": {
+      "name": "python3 -m http.server",
+      "command": "python3 -m http.server 3000",
+      "runAtStart": true
+    }
+  }
+}
